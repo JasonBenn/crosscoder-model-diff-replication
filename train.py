@@ -1,21 +1,30 @@
 # %%
 from utils import *
 from trainer import Trainer
+
 # %%
-device = 'cuda:0'
+device = "cuda:0"
+from transformers import AutoModelForCausalLM
 
 base_model = HookedTransformer.from_pretrained(
-    "gemma-2-2b", 
-    device=device, 
+    "Qwen/Qwen2.5-1.5B",
+    hf_model=AutoModelForCausalLM.from_pretrained(
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+    ),
+    device=device,
+    dtype=torch.bfloat16,
 )
 
 chat_model = HookedTransformer.from_pretrained(
-    "gemma-2-2b-it", 
-    device=device, 
+    "Qwen/Qwen2.5-1.5B",
+    hf_model=AutoModelForCausalLM.from_pretrained(
+        "aokellermann/deepscaler_1.5b_16k_eurus_2_math"
+    ),
+    device=device,
+    dtype=torch.bfloat16,
 )
-
 # %%
-all_tokens = load_pile_lmsys_mixed_tokens()
+all_tokens = load_eurus_tokens()
 
 # %%
 default_cfg = {
@@ -31,7 +40,7 @@ default_cfg = {
     "dict_size": 2**14,
     "seq_len": 1024,
     "enc_dtype": "fp32",
-    "model_name": "gemma-2-2b",
+    "model_name": "deepscaler_1.5b_16k_eurus_2_math",
     "site": "resid_pre",
     "device": "cuda:0",
     "model_batch_size": 4,
@@ -39,11 +48,12 @@ default_cfg = {
     "save_every": 30000,
     "dec_init_norm": 0.08,
     "hook_point": "blocks.14.hook_resid_pre",
-    "wandb_project": "YOUR_WANDB_PROJECT",
-    "wandb_entity": "YOUR_WANDB_ENTITY",
+    "wandb_project": "crosscoders",
+    "wandb_entity": "jasoncbenn",
 }
 cfg = arg_parse_update_cfg(default_cfg)
 
 trainer = Trainer(cfg, base_model, chat_model, all_tokens)
 trainer.train()
+
 # %%

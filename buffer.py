@@ -2,6 +2,7 @@ from utils import *
 from transformer_lens import ActivationCache
 import tqdm
 
+
 class Buffer:
     """
     This defines a data buffer, to store a stack of acts across both model that can be used to train the autoencoder. It'll automatically run the model to generate more when it gets halfway empty.
@@ -17,7 +18,9 @@ class Buffer:
             (self.buffer_size, 2, model_A.cfg.d_model),
             dtype=torch.bfloat16,
             requires_grad=False,
-        ).to(cfg["device"]) # hardcoding 2 for model diffing
+        ).to(
+            cfg["device"]
+        )  # hardcoding 2 for model diffing
         self.cfg = cfg
         self.model_A = model_A
         self.model_B = model_B
@@ -25,28 +28,34 @@ class Buffer:
         self.first = True
         self.normalize = True
         self.all_tokens = all_tokens
-        
-        estimated_norm_scaling_factor_A = self.estimate_norm_scaling_factor(cfg["model_batch_size"], model_A)
-        estimated_norm_scaling_factor_B = self.estimate_norm_scaling_factor(cfg["model_batch_size"], model_B)
-        
+
+        estimated_norm_scaling_factor_A = self.estimate_norm_scaling_factor(
+            cfg["model_batch_size"], model_A
+        )
+        estimated_norm_scaling_factor_B = self.estimate_norm_scaling_factor(
+            cfg["model_batch_size"], model_B
+        )
+
         self.normalisation_factor = torch.tensor(
-        [
-            estimated_norm_scaling_factor_A,
-            estimated_norm_scaling_factor_B,
-        ],
-        device="cuda:0",
-        dtype=torch.float32,
+            [
+                estimated_norm_scaling_factor_A,
+                estimated_norm_scaling_factor_B,
+            ],
+            device="cuda:0",
+            dtype=torch.float32,
         )
         self.refresh()
 
     @torch.no_grad()
-    def estimate_norm_scaling_factor(self, batch_size, model, n_batches_for_norm_estimate: int = 100):
+    def estimate_norm_scaling_factor(
+        self, batch_size, model, n_batches_for_norm_estimate: int = 100
+    ):
         # stolen from SAELens https://github.com/jbloomAus/SAELens/blob/6d6eaef343fd72add6e26d4c13307643a62c41bf/sae_lens/training/activations_store.py#L370
         norms_per_batch = []
         for i in tqdm.tqdm(
             range(n_batches_for_norm_estimate), desc="Estimating norm scaling factor"
         ):
-            tokens = self.all_tokens[i * batch_size : (i + 1) * batch_size]
+            tokens = self.all_tokens[i * batch_size : (i + 1) * batch_size]  # (4, 1024)
             _, cache = model.run_with_cache(
                 tokens,
                 names_filter=self.cfg["hook_point"],
@@ -86,9 +95,17 @@ class Buffer:
                 )
                 cache_B: ActivationCache
 
-                acts = torch.stack([cache_A[self.cfg["hook_point"]], cache_B[self.cfg["hook_point"]]], dim=0)
-                acts = acts[:, :, 1:, :] # Drop BOS
-                assert acts.shape == (2, tokens.shape[0], tokens.shape[1]-1, self.model_A.cfg.d_model) # [2, batch, seq_len, d_model]
+                acts = torch.stack(
+                    [cache_A[self.cfg["hook_point"]], cache_B[self.cfg["hook_point"]]],
+                    dim=0,
+                )
+                acts = acts[:, :, 1:, :]  # Drop BOS
+                assert acts.shape == (
+                    2,
+                    tokens.shape[0],
+                    tokens.shape[1] - 1,
+                    self.model_A.cfg.d_model,
+                )  # [2, batch, seq_len, d_model]
                 acts = einops.rearrange(
                     acts,
                     "n_layers batch seq_len d_model -> (batch seq_len) n_layers d_model",
