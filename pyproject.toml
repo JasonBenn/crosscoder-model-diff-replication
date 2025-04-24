@@ -12,4 +12,11 @@ dependencies = [
     "torch>=2.6.0",
     "tqdm>=4.67.1",
     "transformer-lens @ git+https://github.com/TransformerLensOrg/TransformerLens.git@dev",
+    "sae-vis @ git+https://github.com/ckkissane/sae_vis.git@crosscoder-vis",
+]
+
+[tool.uv]
+override-dependencies = [
+    "transformer-lens @ git+https://github.com/TransformerLensOrg/TransformerLens.git@dev",
+    "sae-vis @ git+https://github.com/ckkissane/sae_vis.git@crosscoder-vis",
 ]
