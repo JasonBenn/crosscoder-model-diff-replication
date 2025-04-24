@@ -205,7 +205,7 @@ class CrossCoder(nn.Module):
         return instance
 
     @classmethod
-    def load(cls, version: int, checkpoint_version: int = None):
+    def load(cls, version: int, checkpoint_version: int):
         save_dir = (
             Path("/workspace/crosscoder-model-diff-replication/checkpoints")
             / f"version_{version}"
@@ -213,21 +213,12 @@ class CrossCoder(nn.Module):
         if not save_dir.exists():
             raise ValueError(f"Save directory {save_dir} does not exist")
 
-        if checkpoint_version is None:
-            # Get the latest checkpoint
-            checkpoint_version = max(
-                [
-                    int(file.name.split("_")[1])
-                    for file in list(save_dir.iterdir())
-                    if "version" in str(file)
-                ]
-            )
-
         cfg_path = save_dir / f"{str(checkpoint_version)}_cfg.json"
         weight_path = save_dir / f"{str(checkpoint_version)}.pt"
 
+        print(f"Loading {cfg_path}")
         cfg = json.load(open(cfg_path, "r"))
-        pprint.pprint(cfg)
+        # pprint.pprint(cfg)
         self = cls(cfg=cfg)
         self.load_state_dict(torch.load(weight_path))
         return self
