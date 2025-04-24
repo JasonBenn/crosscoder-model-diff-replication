@@ -1,4 +1,3 @@
-# %%
 import os
 from IPython import get_ipython
 
@@ -23,6 +22,7 @@ import plotly.express as px
 from torch.distributions.categorical import Categorical
 from tqdm import tqdm
 import torch
+from transformers import AutoTokenizer
 import numpy as np
 from transformer_lens import HookedTransformer
 from jaxtyping import Float
@@ -263,4 +263,45 @@ def load_eurus_tokens():
         all_tokens = data["input_ids"]
         torch.save(all_tokens, "/workspace/data/eurus-2-rl-data.pt")
         print(f"Saved tokens to disk")
+    return all_tokens
+
+
+def load_sft_reasoning_tokens():
+    DATA_DIR = Path("/workspace/data")
+    TOKENIZED_DATA_PATH = DATA_DIR / "sft-reasoning-data.pt"
+
+    # 1. Try loading cached tokenized data first
+    if TOKENIZED_DATA_PATH.exists():
+        print("Loading tokenized data from disk cache (.pt)")
+        all_tokens = torch.load(TOKENIZED_DATA_PATH)
+        return all_tokens
+
+    data = load_dataset("chuxuan/RL-gen-code-train-sft", split="train")
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-1.5B")
+
+    def tokenize_function(examples):
+        # Concatenate 'problem' and 'reasoning' columns
+        concatenated_texts = [
+            problem + " " + reasoning
+            for problem, reasoning in zip(examples["problem"], examples["reasoning"])
+        ]
+        return tokenizer(
+            concatenated_texts,  # Use the concatenated text
+            padding="max_length",
+            truncation=True,
+            max_length=1024,
+        )
+
+    tokenized_data = data.map(
+        tokenize_function,
+        batched=True,
+        num_proc=4,
+        remove_columns=data.column_names,
+    )
+    print("Tokenization complete")
+
+    tokenized_data.set_format(type="torch", columns=["input_ids"])
+    all_tokens = tokenized_data["input_ids"]
+    torch.save(all_tokens, TOKENIZED_DATA_PATH)
+
     return all_tokens

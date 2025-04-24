@@ -1,17 +1,22 @@
-# %%
-from utils import *
-from trainer import Trainer
-
-# %%
-device = "cuda:0"
+import torch
 from transformers import AutoModelForCausalLM
+
+from trainer import Trainer
+from utils import (
+    HookedTransformer,
+    arg_parse_update_cfg,
+    load_sft_reasoning_tokens,
+)
+
+DEVICE = "cuda:0"
+all_tokens = load_sft_reasoning_tokens()
 
 base_model = HookedTransformer.from_pretrained(
     "Qwen/Qwen2.5-1.5B",
     hf_model=AutoModelForCausalLM.from_pretrained(
         "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
     ),
-    device=device,
+    device=DEVICE,
     dtype=torch.bfloat16,
 )
 
@@ -20,13 +25,10 @@ chat_model = HookedTransformer.from_pretrained(
     hf_model=AutoModelForCausalLM.from_pretrained(
         "aokellermann/deepscaler_1.5b_16k_eurus_2_math"
     ),
-    device=device,
+    device=DEVICE,
     dtype=torch.bfloat16,
 )
-# %%
-all_tokens = load_eurus_tokens()
 
-# %%
 default_cfg = {
     "seed": 49,
     "batch_size": 4096,
@@ -51,9 +53,8 @@ default_cfg = {
     "wandb_project": "crosscoders",
     "wandb_entity": "jasoncbenn",
 }
+
 cfg = arg_parse_update_cfg(default_cfg)
 
 trainer = Trainer(cfg, base_model, chat_model, all_tokens)
 trainer.train()
-
-# %%

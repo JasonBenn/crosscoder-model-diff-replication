@@ -4,6 +4,8 @@ from buffer import Buffer
 import tqdm
 
 from torch.nn.utils import clip_grad_norm_
+
+
 class Trainer:
     def __init__(self, cfg, model_A, model_B, all_tokens):
         self.cfg = cfg
@@ -12,6 +14,9 @@ class Trainer:
         self.crosscoder = CrossCoder(cfg)
         self.buffer = Buffer(cfg, model_A, model_B, all_tokens)
         self.total_steps = cfg["num_tokens"] // cfg["batch_size"]
+        if cfg.get("test_run"):
+            self.total_steps = 1
+            print(f"TEST RUN: total steps set to {self.total_steps}")
 
         self.optimizer = torch.optim.Adam(
             self.crosscoder.parameters(),
