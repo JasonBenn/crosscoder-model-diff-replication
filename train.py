@@ -5,11 +5,11 @@ from trainer import Trainer
 from utils import (
     HookedTransformer,
     arg_parse_update_cfg,
-    load_sft_reasoning_tokens,
+    load_tokens,
 )
 
 DEVICE = "cuda:0"
-all_tokens = load_sft_reasoning_tokens()
+all_tokens = load_tokens("mixed")
 
 base_model = HookedTransformer.from_pretrained(
     "Qwen/Qwen2.5-1.5B",

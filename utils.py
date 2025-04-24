@@ -1,5 +1,10 @@
 import os
+from typing import Literal
 from IPython import get_ipython
+
+import torch
+from datasets import load_dataset, concatenate_datasets
+from transformers import AutoTokenizer
 
 ipython = get_ipython()
 # Code to automatically update the HookedTransformer code as its edited without restarting the kernel
@@ -229,79 +234,81 @@ def arg_parse_update_cfg(default_cfg):
     return cfg
 
 
-def load_eurus_tokens():
-    try:
-        print("Loading data from disk")
-        all_tokens = torch.load("/workspace/data/eurus-2-rl-data.pt")
-    except Exception:
-        print("Data is not cached. Loading data from HF")
-        data = load_dataset(
-            "PRIME-RL/Eurus-2-RL-Data",
-            split="train",
-            cache_dir="/workspace/cache/",
-        )
-        data.save_to_disk("/workspace/data/eurus-2-rl-data.hf")
-        # Tokenize the data if input_ids don't exist
-        if "input_ids" not in data.column_names:
-            print("Tokenizing data...")
-            from transformers import AutoTokenizer
-
-            tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-1.5B")
-
-            def tokenize_function(examples):
-                return tokenizer(
-                    [x[1]["content"] for x in examples["prompt"]],
-                    padding="max_length",  # ?
-                    truncation=True,
-                    max_length=1024,
-                )
-
-            data = data.map(tokenize_function, batched=True, num_proc=4)
-            print("Tokenization complete")
-
-        data.set_format(type="torch", columns=["input_ids"])
-        all_tokens = data["input_ids"]
-        torch.save(all_tokens, "/workspace/data/eurus-2-rl-data.pt")
-        print(f"Saved tokens to disk")
-    return all_tokens
+def _prepare_eurus_text(examples):
+    return [conversation[1]["content"] for conversation in examples["prompt"]]
 
 
-def load_sft_reasoning_tokens():
-    DATA_DIR = Path("/workspace/data")
-    TOKENIZED_DATA_PATH = DATA_DIR / "sft-reasoning-data.pt"
+def _prepare_sft_reasoning_text(examples):
+    return [p + " " + r for p, r in zip(examples["problem"], examples["reasoning"])]
 
-    # 1. Try loading cached tokenized data first
-    if TOKENIZED_DATA_PATH.exists():
-        print("Loading tokenized data from disk cache (.pt)")
-        all_tokens = torch.load(TOKENIZED_DATA_PATH)
-        return all_tokens
 
-    data = load_dataset("chuxuan/RL-gen-code-train-sft", split="train")
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-1.5B")
+def _load_and_tokenize(hf_dataset_id, tokenizer, prepare_text_func):
+    cache_dir = Path(os.getenv("HF_HOME")) / "datasets"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / f"{hf_dataset_id.replace('/', '_')}_tokenized.pt"
+
+    # Check if cached file exists
+    if os.path.exists(cache_file):
+        print(f"Loading tokenized dataset from cache: {cache_file}")
+        return torch.load(cache_file)
+
+    print(f"Loading dataset: {hf_dataset_id}")
+    data = load_dataset(hf_dataset_id, split="train")
 
     def tokenize_function(examples):
-        # Concatenate 'problem' and 'reasoning' columns
-        concatenated_texts = [
-            problem + " " + reasoning
-            for problem, reasoning in zip(examples["problem"], examples["reasoning"])
-        ]
+        texts_to_tokenize = prepare_text_func(examples)
         return tokenizer(
-            concatenated_texts,  # Use the concatenated text
+            texts_to_tokenize,
             padding="max_length",
             truncation=True,
             max_length=1024,
         )
 
+    print(f"Tokenizing dataset: {hf_dataset_id}...")
+    original_columns = list(data.column_names)
     tokenized_data = data.map(
         tokenize_function,
         batched=True,
         num_proc=4,
-        remove_columns=data.column_names,
+        remove_columns=original_columns,
+        desc=f"Tokenizing {hf_dataset_id}",
     )
-    print("Tokenization complete")
 
     tokenized_data.set_format(type="torch", columns=["input_ids"])
-    all_tokens = tokenized_data["input_ids"]
-    torch.save(all_tokens, TOKENIZED_DATA_PATH)
+    input_ids = tokenized_data["input_ids"]
 
-    return all_tokens
+    # Save to cache
+    print(f"Saving tokenized dataset to cache: {cache_file}")
+    torch.save(input_ids, cache_file)
+
+    return input_ids
+
+
+DATASET_CONFIG = {
+    "eurus": {
+        "hf_id": "PRIME-RL/Eurus-2-RL-Data",
+        "prepare_func": _prepare_eurus_text,
+    },
+    "sft_reasoning": {
+        "hf_id": "chuxuan/RL-gen-code-train-sft",
+        "prepare_func": _prepare_sft_reasoning_text,
+    },
+}
+
+
+def load_tokens(dataset_type: Literal["eurus", "sft_reasoning", "mixed"]):
+    """Loads specified tokenized dataset, relying on HF cache."""
+    if dataset_type == "mixed":
+        eurus_tokens = load_tokens("eurus")
+        sft_tokens = load_tokens("sft_reasoning")
+        all_tokens = torch.cat((eurus_tokens, sft_tokens), dim=0)
+        return all_tokens
+
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-1.5B")
+
+    config = DATASET_CONFIG[dataset_type]
+    return _load_and_tokenize(
+        hf_dataset_id=config["hf_id"],
+        tokenizer=tokenizer,
+        prepare_text_func=config["prepare_func"],
+    )
