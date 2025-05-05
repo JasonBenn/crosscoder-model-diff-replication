@@ -1,5 +1,5 @@
 [project]
-name = "crosscoder-model-diff-replication"
+name = "crosscoder_model_diff_replication"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
