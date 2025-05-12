@@ -1,12 +1,10 @@
 # %%
-# import torch
+import torch
 import os
 from transformers import AutoModelForCausalLM
 
-from crosscoder import CrossCoder
-from utils import (
-    HookedTransformer,
-)
+from src.crosscoder_model_diff_replication.crosscoder import CrossCoder
+from transformer_lens import HookedTransformer
 import torch
 import einops
 import plotly.express as px
@@ -16,7 +14,7 @@ DEVICE = "cuda:0"
 # %%
 torch.set_grad_enabled(False)  # important for memory
 # TODO: this directory should be specific to a (base_model, rl_model) tuple
-coder = CrossCoder.load(version=5, checkpoint_version=2)
+coder = CrossCoder.load(version=6, checkpoint_version=3)
 norms = coder.W_dec.norm(dim=-1)
 relative_norms = norms[:, 1] / norms.sum(dim=-1)
 print(relative_norms.shape, norms.shape)
@@ -63,6 +61,9 @@ fig.show()
 
 
 # %%
+from pathlib import Path
+ROOT_DIR = Path(__file__).parent
+CODE_DIR = ROOT_DIR.parent
 
 # import argparse 
 # argparse = argparse.ArgumentParser()
@@ -77,8 +78,8 @@ fig.show()
 # else:
 #     all_tokens = torch.load(args.tokens_path)
 
-all_tokens = torch.load("/workspace/upweight-reason/data/tokenized/mbpp__1/tokens.pt")
-
+all_tokens = torch.load(CODE_DIR / "upweight-reason/data/tokenized/mbpp__1/tokens.pt")
+all_tokens.shape
 
 # %%
 import copy
@@ -210,6 +211,7 @@ ce_metrics
 base_estimated_scaling_factor = 0.2835
 chat_estimated_scaling_factor = 0.2533
 
+# %%
 import copy
 folded_cross_coder = copy.deepcopy(cross_coder)
 
@@ -244,6 +246,8 @@ all_idxs = np.arange(0, 16384)
 exclusions = set(rl_idxs) | set(base_idxs)
 allowed = np.array([i for i in all_idxs if i not in exclusions], dtype=int)
 test_feature_idx = np.random.choice(allowed, size=N_SAMPLED_IDXS, replace=False).tolist()
+
+# %%
 from sae_vis.data_config_classes import SaeVisConfig
 sae_vis_config = SaeVisConfig(
     hook_point = folded_cross_coder.cfg["hook_point"],
@@ -285,6 +289,7 @@ min_len = min([len(rl_idxs), len(base_idxs)])  # don't care about common_idxs as
 min_len
 final_indexes = rl_idxs[:min_len] + base_idxs[:min_len] + normal_idxs[:min_len]
 
+# %%
 from sae_vis.data_config_classes import SaeVisConfig
 sae_vis_config = SaeVisConfig(
     hook_point = folded_cross_coder.cfg["hook_point"],
@@ -302,7 +307,7 @@ sae_vis_data = SaeVisData.create(
     tokens = all_tokens[:128], # in practice, better to use more data
     cfg = sae_vis_config,
 )
-filename = f"/workspace/crosscoder-model-diff-replication/visualizations/crosscoder_v{5}__checkpoint_{2}__128_tokens.html"
+filename = ROOT_DIR / f"visualizations/crosscoder_v{6}__checkpoint_{3}__128_tokens.html"
 sae_vis_data.save_feature_centric_vis(filename)
 folded_cross_coder.cfg["hook_point"]
 rl_logits, rl_cache = chat_model.run_with_cache(

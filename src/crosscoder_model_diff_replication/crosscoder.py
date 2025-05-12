@@ -1,15 +1,20 @@
 from utils import *
 
+import json
 from torch import nn
 import pprint
 import torch.nn.functional as F
+import einops
 from typing import Optional, Union
 from huggingface_hub import hf_hub_download
 
+import torch
 from typing import NamedTuple
 
+ROOT_DIR = Path(__file__).parent.parent.parent
+print(ROOT_DIR)
 DTYPES = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
-CHECKPOINTS_DIR = Path("/workspace/crosscoder-model-diff-replication/checkpoints")
+CHECKPOINTS_DIR = ROOT_DIR / "checkpoints"
 
 
 class LossOutput(NamedTuple):
@@ -206,10 +211,7 @@ class CrossCoder(nn.Module):
 
     @classmethod
     def load(cls, version: int, checkpoint_version: int):
-        save_dir = (
-            Path("/workspace/crosscoder-model-diff-replication/checkpoints")
-            / f"version_{version}"
-        )
+        save_dir = CHECKPOINTS_DIR / f"version_{version}"
         if not save_dir.exists():
             raise ValueError(f"Save directory {save_dir} does not exist")
 

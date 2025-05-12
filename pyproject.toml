@@ -1,5 +1,5 @@
 [project]
-name = "crosscoder_model_diff_replication"
+name = "crosscoder-model-diff-replication"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -14,6 +14,13 @@ dependencies = [
     "transformer-lens @ git+https://github.com/TransformerLensOrg/TransformerLens.git@dev",
     "sae-vis @ git+https://github.com/ckkissane/sae_vis.git@crosscoder-vis",
 ]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["crosscoder_model_diff_replication*"]
 
 [tool.uv]
 override-dependencies = [

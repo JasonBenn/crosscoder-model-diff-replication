@@ -14,7 +14,7 @@ all_tokens = load_tokens("mixed")
 base_model = HookedTransformer.from_pretrained(
     "Qwen/Qwen2.5-1.5B",
     hf_model=AutoModelForCausalLM.from_pretrained(
-        "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+        "Qwen/Qwen2.5-1.5B-Instruct"
     ),
     device=DEVICE,
     dtype=torch.bfloat16,
