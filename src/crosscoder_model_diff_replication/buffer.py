@@ -95,24 +95,23 @@ class Buffer:
                 )
                 cache_B: ActivationCache
 
-                acts = torch.stack(
+                acts_2BLD = torch.stack(
                     [cache_A[self.cfg["hook_point"]], cache_B[self.cfg["hook_point"]]],
                     dim=0,
                 )
-                acts = acts[:, :, 1:, :]  # Drop BOS
-                assert acts.shape == (
+                assert acts_2BLD.shape == (
                     2,
                     tokens.shape[0],
                     tokens.shape[1] - 1,
                     self.model_A.cfg.d_model,
                 )  # [2, batch, seq_len, d_model]
-                acts = einops.rearrange(
-                    acts,
+                acts_2BLD = einops.rearrange(
+                    acts_2BLD,
                     "n_layers batch seq_len d_model -> (batch seq_len) n_layers d_model",
                 )
 
-                self.buffer[self.pointer : self.pointer + acts.shape[0]] = acts
-                self.pointer += acts.shape[0]
+                self.buffer[self.pointer : self.pointer + acts_2BLD.shape[0]] = acts_2BLD
+                self.pointer += acts_2BLD.shape[0]
                 self.token_pointer += self.cfg["model_batch_size"]
 
         self.pointer = 0
@@ -129,4 +128,20 @@ class Buffer:
             self.refresh()
         if self.normalize:
             out = out * self.normalisation_factor[None, :, None]
+        return out
+
+class PrecachedActivationsBuffer:
+    def __init__(self, base_act_path, ft_act_path, cfg):
+        self.base_act_path = base_act_path
+        self.ft_act_path = ft_act_path
+        self.base_acts = torch.load(self.base_act_path)
+        self.ft_acts = torch.load(self.ft_act_path)
+        self.pointer = 0
+        self.batch_size = cfg["batch_size"]
+
+        # TODO: normalize?
+
+    def next(self):
+        out = torch.stack([self.base_acts[self.pointer : self.pointer + self.batch_size], self.ft_acts[self.pointer : self.pointer + self.batch_size]], dim=0)
+        self.pointer += self.batch_size
         return out

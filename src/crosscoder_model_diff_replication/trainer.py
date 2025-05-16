@@ -7,12 +7,10 @@ from torch.nn.utils import clip_grad_norm_
 
 
 class Trainer:
-    def __init__(self, cfg, model_A, model_B, all_tokens):
+    def __init__(self, cfg, buffer):
         self.cfg = cfg
-        self.model_A = model_A
-        self.model_B = model_B
         self.crosscoder = CrossCoder(cfg)
-        self.buffer = Buffer(cfg, model_A, model_B, all_tokens)
+        self.buffer = buffer
         self.total_steps = cfg["num_tokens"] // cfg["batch_size"]
         if cfg.get("test_run"):
             self.total_steps = 1
@@ -76,6 +74,8 @@ class Trainer:
 
     def train(self):
         self.step_counter = 0
+        if self.cfg['tiny_mode']:
+            self.total_steps = 1
         try:
             for i in tqdm.trange(self.total_steps):
                 loss_dict = self.step()

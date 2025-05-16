@@ -5,3 +5,5 @@ visualizations
 checkpoints
 .env
 *.egg-info
+logs
+scratch.py
