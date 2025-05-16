@@ -13,6 +13,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "transformer-lens @ git+https://github.com/TransformerLensOrg/TransformerLens.git@dev",
     "sae-vis @ git+https://github.com/ckkissane/sae_vis.git@crosscoder-vis",
+    "vllm>=0.8.5.post1",
 ]
 
 [tool.setuptools.package-dir]
